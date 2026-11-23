@@ -5,6 +5,8 @@ name: build-sim-argmap-fix
 # ~10.6 GB `next build` does not OOM.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: read

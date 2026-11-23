@@ -1,0 +1,44 @@
+name: build-sim-argmap-fix
+
+# Builds a Sim.ai image with the workflow_executor arg-mapping fix and pushes it
+# to GHCR. Runs on GitHub's free 16 GB public-repo runner; swap is added so the
+# ~10.6 GB `next build` does not OOM.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout build scripts
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/share/swift /usr/local/.ghcup
+          df -h
+
+      - name: Add swap (avoid OOM)
+        run: |
+          sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+      - name: Build patched Sim.ai image
+        run: node build.cjs --no-srcmaps --tag ghcr.io/hoanganhb680-arch/suasimai:latest
+
+      - name: Inspect built image
+        run: docker images | grep -i suasimai || docker images
+
+      - name: Log in to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push image to GHCR
+        run: docker push ghcr.io/hoanganhb680-arch/suasimai:latest

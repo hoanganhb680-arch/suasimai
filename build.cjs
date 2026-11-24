@@ -89,15 +89,16 @@ function main() {
   //    reach hundreds of Node processes and >20 GB RSS. `--parallelism 2`
   //    (equivalently TURBO_TASKS_AVAILABLE_PARALLELISM=2) caps every loader pool
   //    at 2 processes; RAYON_NUM_THREADS=2 bounds Turbopack's native Rust thread
-  //    pool; and the V8 heap is lowered 8192 -> 6144. This is what lets a 16 GB
-  //    runner finish instead of being OOM-killed mid "optimizing generated CSS".
+  //    pool. The V8 heap is deliberately KEPT at 8192: lowering it risks a NEW
+  //    main-process "JavaScript heap out of memory" during compilation, which is
+  //    a different crash than the loader-pool OOM this targets.
   const pkgRel = path.join('apps', 'sim', 'package.json');
   const pkgAnchor = "NODE_OPTIONS='--max-old-space-size=8192' next build";
   const pkgReplacement =
-    "NODE_OPTIONS='--max-old-space-size=6144' TURBO_TASKS_AVAILABLE_PARALLELISM=2 RAYON_NUM_THREADS=2 next build";
+    "NODE_OPTIONS='--max-old-space-size=8192' TURBO_TASKS_AVAILABLE_PARALLELISM=2 RAYON_NUM_THREADS=2 next build";
   const pkgText = replaceOnce(read(repoDir, pkgRel), pkgAnchor, pkgReplacement, 'next build memory flags');
   write(repoDir, pkgRel, pkgText);
-  console.log('Applied Turbopack memory limits (parallelism=2, rayon=2, heap=6144)');
+  console.log('Applied Turbopack memory limits (parallelism=2, rayon=2; heap kept at 8192)');
 
   // 4) Build the image. DOCKER_BUILD=1 (handled inside app.Dockerfile) skips the
   //    type check and emits the standalone output.

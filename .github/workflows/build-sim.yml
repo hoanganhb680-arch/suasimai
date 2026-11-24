@@ -29,12 +29,17 @@ jobs:
           sudo docker system df || true
           df -h
 
-      - name: Add swap (best-effort; 16 GB native is generally enough)
+      - name: Add swap (dd, not fallocate — swapoff the runner's default 4 GB first)
         run: |
-          sudo fallocate -l 8G /swapfile 2>/dev/null || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192 2>/dev/null || true
-          sudo chmod 600 /swapfile 2>/dev/null || true
-          sudo mkswap /swapfile 2>/dev/null || true
-          sudo swapon /swapfile 2>/dev/null || echo "swap not available on this runner; continuing on 16 GB native RAM"
+          sudo swapoff -a 2>/dev/null || true
+          sudo rm -f /swapfile /mnt/swapfile 2>/dev/null || true
+          if sudo dd if=/dev/zero of=/swapfile bs=1M count=12288 status=none 2>/dev/null; then
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile && echo "SWAP_ADDED=12GB" || echo "swapon failed; continuing (parallelism fix is primary)"
+          else
+            echo "swapfile create failed; continuing (parallelism fix is primary)"
+          fi
           free -h
 
       - name: Build patched Sim.ai image

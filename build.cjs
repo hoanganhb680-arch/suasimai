@@ -100,6 +100,19 @@ function main() {
   write(repoDir, pkgRel, pkgText);
   console.log('Applied Turbopack memory limits (parallelism=2, rayon=2; heap kept at 8192)');
 
+  // 3c) Cap the STATIC worker pool (page-data collection + static generation) to
+  //    1 worker. Next 16.4.x spawns N static workers where EACH holds its own
+  //    copy of the compiled module graph, so on a 16 GB runner "Collecting page
+  //    data using 3 workers" OOMs after the compile phase already succeeded
+  //    (vercel/next.js#95744/#95745). `experimental.cpus = 1` => 1 worker => 1
+  //    copy, which fits. This is a DIFFERENT pool from the Turbopack compile
+  //    (handled by TURBO_TASKS_AVAILABLE_PARALLELISM=2 above).
+  const cfg2Rel = path.join('apps', 'sim', 'next.config.ts');
+  const cpusReplacement = '    preloadEntriesOnStart: false,\n    cpus: 1,';
+  const cfg2 = replaceOnce(read(repoDir, cfg2Rel), '    preloadEntriesOnStart: false,', cpusReplacement, 'experimental.cpus');
+  write(repoDir, cfg2Rel, cfg2);
+  console.log('Capped static worker pool to 1 (experimental.cpus = 1)');
+
   // 4) Build the image. DOCKER_BUILD=1 (handled inside app.Dockerfile) skips the
   //    type check and emits the standalone output.
   run('docker', ['build', '-f', path.join(repoDir, 'docker', 'app.Dockerfile'), '-t', opts.tag, repoDir]);
